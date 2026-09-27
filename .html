@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Dodge</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10151d;color:white;font-family:Arial,sans-serif;text-align:center}
+h1{margin:15px 0 5px}.info{font-size:18px;margin:8px}
+#game{position:relative;width:360px;height:600px;margin:10px auto;overflow:hidden;background:#454545;border:4px solid white;border-radius:10px}
+#road{position:absolute;inset:0;background:#3f4145}
+.edge{position:absolute;top:0;width:5px;height:100%;background:white;z-index:1}.left{left:28px}.right{right:28px}
+.lane{position:absolute;top:-100px;width:6px;height:80px;background:white;z-index:1}
+.car{position:absolute;width:52px;height:88px;border-radius:13px;z-index:3}
+.car .window{position:absolute;left:8px;top:12px;width:36px;height:25px;background:#172330;border-radius:8px}
+.car .wheel{position:absolute;width:7px;height:20px;background:#111;border-radius:3px;top:25px}
+.car .w1{left:-5px}.car .w2{right:-5px}
+.car .w3{left:-5px;bottom:12px;top:auto}.car .w4{right:-5px;bottom:12px;top:auto}
+#player{left:154px;bottom:20px;background:linear-gradient(90deg,#0878ff,#48b5ff,#0878ff);border:2px solid #a9e4ff}
+.enemy{background:linear-gradient(90deg,#d7193f,#ff526d,#c91438);border:2px solid #ff9aaa}
+#message{position:absolute;inset:0;background:#000b;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:25px}
+#message h2{font-size:40px;margin:5px;color:#50b8ff}
+button{border:0;border-radius:8px;background:#168cff;color:#fff;padding:12px 25px;font-size:18px;cursor:pointer}
+.controls button{font-size:24px;width:90px;margin:4px}
+#pause{background:#37465b;font-size:14px;padding:7px 12px}
+</style>
+</head>
+<body>
+<h1>🚗 CAR DODGE</h1>
+<div class="info">Score: <b id="score">0</b> &nbsp; ❤️ <b id="lives">3</b> &nbsp; Level: <b id="level">1</b></div>
+
+<div id="game">
+  <div id="road"></div>
+  <div class="edge left"></div><div class="edge right"></div>
+  <div id="player" class="car">
+    <div class="window"></div>
+    <div class="wheel w1"></div><div class="wheel w2"></div>
+    <div class="wheel w3"></div><div class="wheel w4"></div>
+  </div>
+
+  <div id="message">
+    <h2>CAR DODGE</h2>
+    <p>Move left and right and avoid the red cars.</p>
+    <button id="start">START GAME</button>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="left">⬅️</button>
+  <button id="pause">PAUSE</button>
+  <button id="right">➡️</button>
+</div>
+<p>Keyboard: ← → or A / D</p>
+
+<script>
+const game=document.getElementById("game");
+const player=document.getElementById("player");
+const scoreText=document.getElementById("score");
+const livesText=document.getElementById("lives");
+const levelText=document.getElementById("level");
+const message=document.getElementById("message");
+
+let playerX=154, score=0, lives=3, level=1;
+let speed=4, playing=false, paused=false, enemies=[];
+let lastSpawn=0, animationId=0;
+
+const lanes=[45,102,154,206,258];
+
+for(let i=0;i<7;i++){
+  const line=document.createElement("div");
+  line.className="lane";
+  line.style.left="177px";
+  line.style.top=(i*100-100)+"px";
+  game.appendChild(line);
+}
+
+function move(dir){
+  if(!playing||paused)return;
+  playerX += dir*28;
+  playerX=Math.max(35,Math.min(273,playerX));
+  player.style.left=playerX+"px";
+}
+
+document.getElementById("left").onclick=()=>move(-1);
+document.getElementById("right").onclick=()=>move(1);
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")move(-1);
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")move(1);
+  if(e.key.toLowerCase()==="p")togglePause();
+});
+
+function makeEnemy(){
+  const e=document.createElement("div");
+  e.className="car enemy";
+  e.innerHTML='<div class="window"></div><div class="wheel w1"></div><div class="wheel w2"></div><div class="wheel w3"></div><div class="wheel w4"></div>';
+  e.style.left=lanes[Math.floor(Math.random()*lanes.length)]+"px";
+  e.style.top="-100px";
+  game.appendChild(e);
+  enemies.push(e);
+}
+
+function overlap(a,b){
+  const A=a.getBoundingClientRect(),B=b.getBoundingClientRect();
+  return A.left+8<B.right-8 && A.right-8>B.left+8 &&
+         A.top+10<B.bottom-10 && A.bottom-10>B.top+10;
+}
+
+function startGame(){
+  enemies.forEach(e=>e.remove());
+  enemies=[];
+  playerX=154; score=0; lives=3; level=1; speed=4;
+  player.style.left=playerX+"px";
+  scoreText.textContent=score;
+  livesText.textContent=lives;
+  levelText.textContent=level;
+  message.style.display="none";
+  playing=true; paused=false; lastSpawn=performance.now();
+  cancelAnimationFrame(animationId);
+  animationId=requestAnimationFrame(loop);
+}
+
+function loop(time){
+  if(!playing){return}
+  if(paused){animationId=requestAnimationFrame(loop);return}
+
+  document.querySelectorAll(".lane").forEach(line=>{
+    let y=parseFloat(line.style.top)+speed;
+    if(y>600)y=-80;
+    line.style.top=y+"px";
+  });
+
+  if(time-lastSpawn > Math.max(550,1100-level*45)){
+    makeEnemy();
+    lastSpawn=time;
+  }
+
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    let y=parseFloat(e.style.top)+speed;
+    e.style.top=y+"px";
+
+    if(overlap(player,e)){
+      e.remove(); enemies.splice(i,1);
+      lives--;
+      livesText.textContent=lives;
+      if(lives<=0){gameOver();return}
+      continue;
+    }
+
+    if(y>610){
+      e.remove(); enemies.splice(i,1);
+      score++;
+      scoreText.textContent=score;
+      level=Math.floor(score/10)+1;
+      speed=4+(level-1)*0.5;
+      levelText.textContent=level;
+    }
+  }
+  animationId=requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  playing=false;
+  cancelAnimationFrame(animationId);
+  message.innerHTML='<h2>GAME OVER</h2><p>Your score: <b>'+score+'</b></p><button id="restart">PLAY AGAIN</button>';
+  message.style.display="flex";
+  document.getElementById("restart").onclick=startGame;
+}
+
+function togglePause(){
+  if(!playing)return;
+  paused=!paused;
+  document.getElementById("pause").textContent=paused?"RESUME":"PAUSE";
+}
+
+document.getElementById("start").onclick=startGame;
+</script>
+</body>
+</html>
